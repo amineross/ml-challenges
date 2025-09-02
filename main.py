@@ -15,7 +15,7 @@ def pnsr(y, y_hat, n, m, d: float = 255.0):
             return float('inf')
         return 10.0 * np.log10((n * m * 3 * (d ** 2)) / sse)
 
-def entrainement (model, data, optimizer, device, epochs):
+def entrainement (model, data, optimizer, criterion, device, epochs):
     model.to(device)
     model.train()
     for epoch in range(epochs):
@@ -29,12 +29,13 @@ def entrainement (model, data, optimizer, device, epochs):
             optimizer.zero_grad()
             output = model(X)
 
-            loss = pnsr(y, output, 128, 128)
+            currentAcc = pnsr(y, output, 128, 128)
+            loss = criterion(output, y)
             loss.backward()
             optimizer.step()
             currentLoss += loss.item()
     
-        print(f"Epoch {epoch+1:02d} | Loss: {currentLoss/size:.6f}")
+        print(f"Epoch {epoch+1:02d} | Loss: {currentLoss/size:.6f} | Accuracy : {currentAcc/size:.2f}")
 
 
 if __name__=="__main__":
@@ -54,5 +55,6 @@ if __name__=="__main__":
     print(model)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.003)
+    criterion = nn.MSELoss()
 
     entrainement(model, train, optimizer, device, 10)

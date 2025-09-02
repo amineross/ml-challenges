@@ -53,13 +53,15 @@ class ImageDataset(Dataset):
         img_path = os.path.join(self.patches_dir, filename)
 
         img_base = Image.open(img_path)
+
+        # High res
         img = img_base
         img = np.array(img)
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img).float()
         
-
-        img_low_res_base = img_base.resize((img_base.width // 4, img_base.height // 4), Image.BICUBIC)
+        # Low res
+        img_low_res_base = img_base.resize((img_base.width // 4, img_base.height // 4))
         img_low_res = np.array(img_low_res_base)
         img_low_res = img_low_res.transpose(2, 0, 1)
         img_low_res = torch.from_numpy(img_low_res).float()
@@ -71,3 +73,17 @@ if __name__ == '__main__':
     print(f"Nombre de patches : {len(dataset)}")
     img, img_low_res, fname = dataset[0]
     print(f"Shape du patch : {img.shape}, Shape du patch basse résolution : {img_low_res.shape}, nom : {fname}")
+    
+    # Convert tensors to displayable numpy arrays (H, W, C) in [0, 255] uint8
+    img_disp = img.permute(1, 2, 0).clamp(0, 255).to(torch.uint8).numpy()
+    img_low_disp = img_low_res.permute(1, 2, 0).clamp(0, 255).to(torch.uint8).numpy()
+
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.imshow(img_disp)
+    plt.title('High Res')
+    plt.subplot(1, 2, 2)
+    plt.imshow(img_low_disp)
+    plt.title('Low Res')
+    plt.tight_layout()
+    plt.show()

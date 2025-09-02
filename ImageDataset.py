@@ -1,9 +1,4 @@
-""" import torch
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import os
-import matplotlib.pyplot as plt
-
+"""
 class MNISTDataset(Dataset):
     def __init__(self, datasetDirectory):
         self.dir = datasetDirectory
@@ -41,11 +36,30 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from PIL import Image
 
 class ImageDataset(Dataset):
-    def __init__(self, datasetDirectory):
-        self.dir = datasetDirectory
-        self.instanceFiles = sorted(os.listdir(datasetDirectory))
-    
+    def __init__(self, patches_dir):
+        self.patches_dir = patches_dir
+        self.patches_files = sorted([
+            f for f in os.listdir(patches_dir) if f.endswith(".png")
+        ])
+
     def __len__(self):
-        return len(self.instanceFiles)
+        return len(self.patches_files)
+
+    def __getitem__(self, idx):
+        filename = self.patches_files[idx]
+        img_path = os.path.join(self.patches_dir, filename)
+
+        img = Image.open(img_path)
+        img = np.array(img)
+        img = img.transpose(2, 0, 1)
+        img = torch.from_numpy(img).float()
+        return img, filename
+    
+if __name__ == '__main__':
+    dataset = ImageDataset('dataset/patches-div2k')
+    print(f"Nombre de patches : {len(dataset)}")
+    img, fname = dataset[0]
+    print(f"Shape du patch : {img.shape}, nom : {fname}")

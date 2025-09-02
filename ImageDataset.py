@@ -52,14 +52,22 @@ class ImageDataset(Dataset):
         filename = self.patches_files[idx]
         img_path = os.path.join(self.patches_dir, filename)
 
-        img = Image.open(img_path)
+        img_base = Image.open(img_path)
+        img = img_base
         img = np.array(img)
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img).float()
-        return img, filename
+        
+
+        img_low_res_base = img_base.resize((img_base.width // 4, img_base.height // 4), Image.BICUBIC)
+        img_low_res = np.array(img_low_res_base)
+        img_low_res = img_low_res.transpose(2, 0, 1)
+        img_low_res = torch.from_numpy(img_low_res).float()
+        
+        return img, img_low_res, filename
     
 if __name__ == '__main__':
     dataset = ImageDataset('dataset/patches-div2k')
     print(f"Nombre de patches : {len(dataset)}")
-    img, fname = dataset[0]
-    print(f"Shape du patch : {img.shape}, nom : {fname}")
+    img, img_low_res, fname = dataset[0]
+    print(f"Shape du patch : {img.shape}, Shape du patch basse résolution : {img_low_res.shape}, nom : {fname}")

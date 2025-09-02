@@ -2,8 +2,18 @@ from ESPCN import *
 from ImageDataset import *
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import torch
+import numpy as np
 
-
+def pnsr(y, y_hat, n, m, d: float = 255.0):
+        if isinstance(y, torch.Tensor):
+            y = y.detach().cpu().numpy()
+        if isinstance(y_hat, torch.Tensor):
+            y_hat = y_hat.detach().cpu().numpy()
+        sse = ((y - y_hat) ** 2).sum()
+        if sse == 0.0:
+            return float('inf')
+        return 10.0 * np.log10((n * m * 3 * (d ** 2)) / sse)
 
 def entrainement (model, data, optimizer, device, epochs):
     model.to(device)
@@ -12,13 +22,14 @@ def entrainement (model, data, optimizer, device, epochs):
         currentLoss = 0.0
         size = len(data)
 
-        for X, y, label in tqdm(data):
+        for y, X, label in tqdm(data):
+            X = X.to(device)
             y = y.to(device)
 
             optimizer.zero_grad()
             output = model(X)
 
-            loss = ESPCN.pnsr(y, output, 128, 128)
+            loss = pnsr(y, output, 128, 128)
             loss.backward()
             optimizer.step()
             currentLoss += loss.item()
@@ -31,10 +42,13 @@ if __name__=="__main__":
     train = DataLoader(trainDataset, batch_size=10, shuffle=True)
     print(f"{len(train)*10} instances disponibles")
 
-    device = "cpu"
-    if torch.accelerator.is_available():
-        device = torch.accelerator.current_accelerator().type
-    print(f"Using {device} device")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"Using {device.type} device")
 
     model = ESPCN()
     print(model)

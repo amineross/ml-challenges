@@ -45,11 +45,19 @@ if __name__=="__main__":
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
+        device_str = "cuda"
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         device = torch.device("mps")
+        device_str = "mps"
     else:
-        device = torch.device("cpu")
-    print(f"Using {device.type} device")
+        try:
+            import torch_directml
+            device = torch_directml.device()
+            device_str = "dml"
+        except Exception:
+            device = torch.device("cpu")
+            device_str = "cpu"
+    print(f"Using {device_str} device")
 
     model = ESPCN()
     print(model)
@@ -57,4 +65,4 @@ if __name__=="__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.003)
     criterion = nn.MSELoss()
 
-    entrainement(model, train, optimizer, device, 10)
+    entrainement(model, train, optimizer, criterion, device, 10)

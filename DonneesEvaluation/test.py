@@ -110,12 +110,11 @@ def load_model_checkpoint(checkpoint_path, device):
         # New checkpoint format
         model_class = checkpoint["model_class"]
         state_dict = checkpoint["model_state_dict"]
-        scale = checkpoint.get("scale", 4)
-        
+    
         if model_class == "ESPCN":
-            model = ESPCN(scale=scale)
+            model = ESPCN()
         elif model_class == "FSRCNN":
-            model = FSRCNN(scale=scale)
+            model = FSRCNN()
         else:
             raise ValueError(f"Unknown model class: {model_class}")
             

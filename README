@@ -1,3 +1,30 @@
 # ML-Challenges ESIEA 5A
 Amine ROSTANE
 Joplin WAMBA
+
+## Training and Exporting the Model
+
+Train the ESPCN model and export the trained weights (state_dict) to a file.
+
+Example:
+
+```bash
+python main.py --epochs 10 --output-model artifacts/espcn_state_dict.pt
+```
+
+- The output file contains a PyTorch `state_dict` plus metadata (model class, scale, PyTorch version, device, epochs).
+- You can change the save path with `--output-model`. The directory will be created if it does not exist.
+
+## Resuming Training
+
+Continue training from a previously saved model checkpoint:
+
+```bash
+# Resume training for 5 more epochs
+python main.py --resume-from artifacts/espcn_state_dict.pt --epochs 5 --output-model artifacts/espcn_extended.pt
+```
+
+- The `--resume-from` flag loads a saved model checkpoint
+- Training continues with the correct epoch numbering
+- Total epochs are tracked across training sessions
+- If the checkpoint file is invalid or missing, training starts fresh automatically

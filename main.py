@@ -113,13 +113,8 @@ if __name__=="__main__":
         device = torch.device("mps")
         device_str = "mps"
     else:
-        try:
-            import torch_directml
-            device = torch_directml.device()
-            device_str = "dml"
-        except Exception:
-            device = torch.device("cpu")
-            device_str = "cpu"
+        device = torch.device("cpu")
+        device_str = "cpu"
     print(f"Using {device_str} device")
 
     # Initialize or load model

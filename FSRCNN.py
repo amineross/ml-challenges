@@ -4,21 +4,18 @@ import torch.nn.functional as F
 import numpy as np
 
 class FSRCNN(nn.Module):
-    def __init__(self, d, s, scale=4):
+    def __init__(self, d=56, s=12, scale=4):
         super().__init__()
         mapping_layers = []
-
 
         self.feature_extraction = nn.Sequential(
             nn.Conv2d(3, d, 5, padding=2),
             nn.PReLU()
         )
 
-
         self.reducing = nn.Sequential(nn.Conv2d(d, s, 1, padding=0),
             nn.PReLU()
         )
-
 
         for _ in range(4):
             mapping_layers.append(nn.Conv2d(s, s, 3, padding=1))
@@ -30,7 +27,9 @@ class FSRCNN(nn.Module):
             nn.PReLU()
         )
 
-        self.upsampling = nn.Sequential(nn.ConvTranspose2d(d, 3, 9, stride=scale, padding=4),
+        # Fix the upsampling layer to match exact output dimensions
+        self.upsampling = nn.Sequential(
+            nn.ConvTranspose2d(d, 3, 9, stride=scale, padding=4, output_padding=3),
             nn.Sigmoid()
         )
         

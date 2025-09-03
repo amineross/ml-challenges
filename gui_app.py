@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import torch
 import numpy as np
 from ESPCN import ESPCN
+from FSRCNN import FSRCNN
 import os
 import glob
 
@@ -11,7 +12,7 @@ import glob
 class UpscaleApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("ESPCN Upscaler")
+        self.root.title("Image Upscaler")
         self.root.geometry("1200x800")
         self.root.configure(bg='#2b2b2b')
         

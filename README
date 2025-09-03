@@ -7,9 +7,13 @@ Joplin WAMBA
 Train the ESPCN model and export the trained weights (state_dict) to a file.
 
 Example:
-
+# ESPCN
 ```bash
-python main.py --epochs 10 --output-model artifacts/espcn_state_dict.pt
+python main.py --model-class ESPCN --epochs 10 --output-model artifacts/espcn_state_dict.pt
+```
+# FSRCNN
+```
+python main.py --model-class FSRCNN --epochs 10 --output-model artifacts/fsrcnn_state_dict.pt
 ```
 
 - The output file contains a PyTorch `state_dict` plus metadata (model class, scale, PyTorch version, device, epochs).
@@ -21,7 +25,7 @@ Continue training from a previously saved model checkpoint:
 
 ```bash
 # Resume training for 5 more epochs
-python main.py --resume-from artifacts/espcn_state_dict.pt --epochs 5 --output-model artifacts/espcn_extended.pt
+python main.py --model_class ESPCN --resume-from artifacts/espcn_state_dict.pt --epochs 5 --output-model artifacts/espcn_extended.pt
 ```
 
 - The `--resume-from` flag loads a saved model checkpoint

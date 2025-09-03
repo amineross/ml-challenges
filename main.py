@@ -1,4 +1,5 @@
 from ESPCN import *
+from FSRCNN import *
 from ImageDataset import *
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -94,6 +95,7 @@ def entrainement(model, data, optimizer, criterion, device, epochs, start_epoch=
 if __name__=="__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Train ESPCN and export trained model")
+    parser.add_argument("--model-class", type=str, default="ESPCN", help="Model class to train")
     parser.add_argument("--output-model", type=str, default="artifacts/espcn_state_dict.pt", help="Path to save trained model state_dict")
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--resume-from", type=str, help="Path to model checkpoint to resume training from")
@@ -124,6 +126,11 @@ if __name__=="__main__":
     previous_epochs = 0
     learning_rate = args.learning_rate  # Default from CLI
     
+    if args.model_class == "ESPCN":
+        model = ESPCN()
+    elif args.model_class == "FSRCNN":
+        model = FSRCNN()
+
     if args.resume_from:
         try:
             model, previous_epochs, learning_rate = load_model_checkpoint(args.resume_from, device)
@@ -134,11 +141,9 @@ if __name__=="__main__":
         except Exception as e:
             print(f"Error loading checkpoint: {e}")
             print("Starting fresh training instead...")
-            model = ESPCN()
             previous_epochs = 0
             learning_rate = args.learning_rate
-    else:
-        model = ESPCN()
+
     
     print(model)
 
@@ -159,13 +164,14 @@ if __name__=="__main__":
 
     save_payload = {
         "model_state_dict": model.state_dict(),
-        "model_class": "ESPCN",
+        "model_class": args.model_class,
         "scale": getattr(model, "scale", None),
         "pytorch_version": torch.__version__,
         "device": device_str,
         "epochs": total_epochs,
         "learning_rate": learning_rate,
     }
+    
     torch.save(save_payload, output_path)
     print(f"Saved trained model to: {output_path}")
     print(f"Total epochs trained: {total_epochs}")

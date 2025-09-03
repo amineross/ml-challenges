@@ -58,13 +58,13 @@ class ImageDataset(Dataset):
         img = img_base
         img = np.array(img)
         img = img.transpose(2, 0, 1)
-        img = torch.from_numpy(img).float()
+        img = torch.from_numpy(img).float() / 255.0
         
         # Low res
         img_low_res_base = img_base.resize((img_base.width // 4, img_base.height // 4))
         img_low_res = np.array(img_low_res_base)
         img_low_res = img_low_res.transpose(2, 0, 1)
-        img_low_res = torch.from_numpy(img_low_res).float()
+        img_low_res = torch.from_numpy(img_low_res).float() / 255.0
 
 
         return img, img_low_res, filename

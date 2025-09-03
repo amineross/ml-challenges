@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
-def pnsr(y, y_hat, n, m, d: float = 255.0):
+"""def pnsr(y, y_hat, n, m, d: float = 255.0):
         if isinstance(y, torch.Tensor):
             y = y.detach().cpu().numpy()
         if isinstance(y_hat, torch.Tensor):
@@ -14,12 +14,22 @@ def pnsr(y, y_hat, n, m, d: float = 255.0):
         if sse == 0.0:
             return float('inf')
         return 10.0 * np.log10((n * m * 3 * (d ** 2)) / sse)
+"""
+
+def pnsr(y, y_hat, d=1.0):
+    mse = torch.mean((y - y_hat) ** 2)
+    if mse == 0:
+        return float('inf')
+    return 10 * torch.log10(d**2 / mse).item()
+
+
 
 def entrainement (model, data, optimizer, criterion, device, epochs):
     model.to(device)
     model.train()
     for epoch in range(epochs):
         currentLoss = 0.0
+        pnsr_total = 0.0
         size = len(data)
 
         for y, X, label in tqdm(data):
@@ -29,13 +39,15 @@ def entrainement (model, data, optimizer, criterion, device, epochs):
             optimizer.zero_grad()
             output = model(X)
 
-            currentAcc = pnsr(y, output, 128, 128)
+            pnsr_batch = pnsr(y, output)
             loss = criterion(output, y)
             loss.backward()
             optimizer.step()
             currentLoss += loss.item()
+
+            pnsr_total += pnsr_batch
     
-        print(f"Epoch {epoch+1:02d} | Loss: {currentLoss/size:.6f} | Accuracy : {currentAcc/size:.2f}")
+        print(f"Epoch {epoch+1:02d} | Loss: {currentLoss/size:.6f} | PNSR : {pnsr_total/size:.2f}")
 
 
 if __name__=="__main__":

@@ -91,26 +91,34 @@ def downscale_bicubic(img: np.ndarray, scale: int) -> np.ndarray:
     new_h, new_w = h // scale, w // scale
     return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
 
-def create_side_by_side(downscaled: np.ndarray, upscaled: np.ndarray) -> np.ndarray:
+def create_side_by_side(downscaled: np.ndarray, upscaled: np.ndarray, display_height: int = 480) -> np.ndarray:
     # Les deux images doivent avoir la même taille pour comparaison
     # downscaled = LR, upscaled = SR (même taille que l'original)
     h_up, w_up = upscaled.shape[:2]
     h_down, w_down = downscaled.shape[:2]
     
-    # Resize downscaled à la même taille que upscaled pour comparaison visuelle
-    downscaled_resized = cv2.resize(downscaled, (w_up, h_up), interpolation=cv2.INTER_CUBIC)
+    # Calculer les dimensions d'affichage (garder le ratio)
+    display_ratio = display_height / h_up
+    display_width = int(w_up * display_ratio)
+    
+    # Resize les deux images à la taille d'affichage
+    downscaled_display = cv2.resize(downscaled, (display_width, display_height), interpolation=cv2.INTER_CUBIC)
+    upscaled_display = cv2.resize(upscaled, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
     
     # Concatener horizontalement : Downscaled (bicubic) | SR Upscaled
-    comparison = np.hstack([downscaled_resized, upscaled])
+    comparison = np.hstack([downscaled_display, upscaled_display])
     
-    # Ajouter des labels
+    # Ajouter des labels (texte plus petit pour les petites fenêtres)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(comparison, f"Downscaled ({w_down}x{h_down})", (10, 30), font, 1, (0, 255, 0), 2)
-    cv2.putText(comparison, f"SR Upscaled ({w_up}x{h_up})", (w_up + 10, 30), font, 1, (255, 0, 0), 2)
+    font_scale = 0.7 if display_height < 500 else 1.0
+    thickness = 1 if display_height < 500 else 2
+    
+    cv2.putText(comparison, f"Bicubic ({w_down}x{h_down})", (10, 25), font, font_scale, (0, 255, 0), thickness)
+    cv2.putText(comparison, f"SR ({w_up}x{h_up})", (display_width + 10, 25), font, font_scale, (255, 0, 0), thickness)
     
     return comparison
 
-def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30):
+def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30, display_height: int = 480):
     model, scale = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
     print(f"Model scale factor: {scale}x")
     cap = open_camera(cam_index, width, height, target_fps)
@@ -146,8 +154,8 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
             # 2. SR upscale from LR back to HR
             upscaled = upscale_frame(downscaled, model, DEVICE, USE_FP16)
             
-            # 3. Side-by-side comparison: Downscaled vs SR
-            comparison = create_side_by_side(downscaled, upscaled)
+            # 3. Side-by-side comparison: Downscaled vs SR (display size)
+            comparison = create_side_by_side(downscaled, upscaled, display_height)
             
         except Exception as e:
             print(f"Inference error: {e}")
@@ -168,6 +176,7 @@ if __name__ == "__main__":
     p.add_argument("--width", type=int, default=1280)
     p.add_argument("--height", type=int, default=720)
     p.add_argument("--target-fps", type=int, default=30)
+    p.add_argument("--display-height", type=int, default=480, help="Height of display window (keeps processing at full res)")
     args = p.parse_args()
 
     run_realtime(
@@ -175,5 +184,6 @@ if __name__ == "__main__":
         cam_index=args.cam_index,
         width=args.width,
         height=args.height,
-        target_fps=args.target_fps
+        target_fps=args.target_fps,
+        display_height=args.display_height
     )

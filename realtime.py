@@ -117,6 +117,8 @@ def create_side_by_side_hr(left_hr: np.ndarray, right_hr: np.ndarray, display_he
 def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30, display_height: int = 480):
     model, scale = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
     print(f"Model scale factor: {scale}x")
+    forced_downscale = 12
+    print(f"Forced downscale factor: {forced_downscale}x")
     cap = open_camera(cam_index, width, height, target_fps)
 
     cv2.namedWindow("SR Comparison", cv2.WINDOW_AUTOSIZE)
@@ -124,7 +126,7 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
     # Warm-up si possible
     ok, frame = cap.read()
     if ok:
-        downscaled = downscale_bicubic(frame, scale)
+        downscaled = downscale_bicubic(frame, forced_downscale)
         for _ in range(3):
             _ = upscale_frame(downscaled, model, DEVICE, USE_FP16)
 
@@ -145,14 +147,16 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
 
         try:
             # 1. Downscale HD frame to LR (simule données d'entrainement)
-            downscaled = downscale_bicubic(frame, scale)
+            downscaled = downscale_bicubic(frame, forced_downscale)
 
             # 2. HR bicubic from LR (baseline): resize LR back to capture res
             h_cap, w_cap = frame.shape[:2]
             left_hr = cv2.resize(downscaled, (w_cap, h_cap), interpolation=cv2.INTER_CUBIC)
             
-            # 3. SR upscale from LR back to HR (model output should be HR)
+            # 3. SR upscale from LR back to HR (model output may be < capture res)
             right_hr = upscale_frame(downscaled, model, DEVICE, USE_FP16)
+            if right_hr.shape[:2] != (h_cap, w_cap):
+                right_hr = cv2.resize(right_hr, (w_cap, h_cap), interpolation=cv2.INTER_LINEAR)
 
             # 4. Side-by-side at controlled display size
             comparison = create_side_by_side_hr(left_hr, right_hr, display_height)

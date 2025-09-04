@@ -147,15 +147,31 @@ class UpscaleApp:
             self.root.update()
             
             checkpoint = torch.load(model_path, map_location=self.device)
-            scale = checkpoint.get("scale", 4)
             
-            self.current_model = ESPCN(scale=scale)
+            # Validate checkpoint structure
+            required_keys = ["model_state_dict", "model_class"]
+            for key in required_keys:
+                if key not in checkpoint:
+                    raise KeyError(f"Missing required key in checkpoint: {key}")
+            
+            # Create model instance based on checkpoint data
+            if checkpoint["model_class"] == "ESPCN":
+                # Default to 4 if not saved
+                self.current_model = ESPCN()
+            elif checkpoint["model_class"] == "FSRCNN":
+                # Get FSRCNN parameters from checkpoint or use default
+                self.current_model = FSRCNN()
+            else:
+                raise ValueError(f"Unknown model class: {checkpoint['model_class']}")
+            
             self.current_model.load_state_dict(checkpoint["model_state_dict"])
             self.current_model.to(self.device)
             self.current_model.eval()
             
             epochs = checkpoint.get("epochs", "unknown")
-            self.status_var.set(f"Model loaded - {epochs} epochs - Device: {self.device}")
+            model_class = checkpoint["model_class"]
+            scale = checkpoint.get("scale", "unknown")
+            self.status_var.set(f"{model_class} model loaded (scale={scale}) - {epochs} epochs - Device: {self.device}")
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load model: {str(e)}")

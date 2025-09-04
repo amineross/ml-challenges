@@ -91,31 +91,27 @@ def downscale_bicubic(img: np.ndarray, scale: int) -> np.ndarray:
     new_h, new_w = h // scale, w // scale
     return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
 
-def create_side_by_side(downscaled: np.ndarray, upscaled: np.ndarray, display_height: int = 480) -> np.ndarray:
-    # Les deux images doivent avoir la même taille pour comparaison
-    # downscaled = LR, upscaled = SR (même taille que l'original)
-    h_up, w_up = upscaled.shape[:2]
-    h_down, w_down = downscaled.shape[:2]
-    
-    # Calculer les dimensions d'affichage (garder le ratio)
-    display_ratio = display_height / h_up
-    display_width = int(w_up * display_ratio)
-    
-    # Resize les deux images à la taille d'affichage
-    downscaled_display = cv2.resize(downscaled, (display_width, display_height), interpolation=cv2.INTER_CUBIC)
-    upscaled_display = cv2.resize(upscaled, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
-    
-    # Concatener horizontalement : Downscaled (bicubic) | SR Upscaled
-    comparison = np.hstack([downscaled_display, upscaled_display])
-    
-    # Ajouter des labels (texte plus petit pour les petites fenêtres)
+def create_side_by_side_hr(left_hr: np.ndarray, right_hr: np.ndarray, display_height: int = 480) -> np.ndarray:
+    # left_hr: bicubic-upsampled LR -> capture resolution
+    # right_hr: SR output -> capture resolution
+    h_hr, w_hr = right_hr.shape[:2]
+
+    # Calculer dimensions d'affichage (même ratio que la résolution de capture)
+    display_ratio = display_height / h_hr
+    display_width = int(w_hr * display_ratio)
+
+    left_display = cv2.resize(left_hr, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
+    right_display = cv2.resize(right_hr, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
+
+    comparison = np.hstack([left_display, right_display])
+
+    # Labels simples (résolution de traitement réelle)
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.7 if display_height < 500 else 1.0
     thickness = 1 if display_height < 500 else 2
-    
-    cv2.putText(comparison, f"Bicubic ({w_down}x{h_down})", (10, 25), font, font_scale, (0, 255, 0), thickness)
-    cv2.putText(comparison, f"SR ({w_up}x{h_up})", (display_width + 10, 25), font, font_scale, (255, 0, 0), thickness)
-    
+    cv2.putText(comparison, "Bicubic (to capture res)", (10, 25), font, font_scale, (0, 255, 0), thickness)
+    cv2.putText(comparison, "SR (to capture res)", (display_width + 10, 25), font, font_scale, (255, 0, 0), thickness)
+
     return comparison
 
 def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30, display_height: int = 480):
@@ -150,12 +146,16 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
         try:
             # 1. Downscale HD frame to LR (simule données d'entrainement)
             downscaled = downscale_bicubic(frame, scale)
+
+            # 2. HR bicubic from LR (baseline): resize LR back to capture res
+            h_cap, w_cap = frame.shape[:2]
+            left_hr = cv2.resize(downscaled, (w_cap, h_cap), interpolation=cv2.INTER_CUBIC)
             
-            # 2. SR upscale from LR back to HR
-            upscaled = upscale_frame(downscaled, model, DEVICE, USE_FP16)
-            
-            # 3. Side-by-side comparison: Downscaled vs SR (display size)
-            comparison = create_side_by_side(downscaled, upscaled, display_height)
+            # 3. SR upscale from LR back to HR (model output should be HR)
+            right_hr = upscale_frame(downscaled, model, DEVICE, USE_FP16)
+
+            # 4. Side-by-side at controlled display size
+            comparison = create_side_by_side_hr(left_hr, right_hr, display_height)
             
         except Exception as e:
             print(f"Inference error: {e}")

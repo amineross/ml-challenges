@@ -27,17 +27,20 @@ except Exception:
 def load_upscaler_from_checkpoint(checkpoint_path: str, device: torch.device, use_fp16: bool):
     ckpt = torch.load(checkpoint_path, map_location=device)
     model_class = ckpt["model_class"]
+    scale = ckpt.get("scale", 4)
+    
     if model_class == "ESPCN":
-        model = ESPCN(scale=ckpt.get("scale", 4))
+        model = ESPCN(scale=scale)
     elif model_class == "FSRCNN":
         model = FSRCNN()
+        scale = 4  # FSRCNN est toujours x4
     else:
         raise ValueError(f"Unknown model class: {model_class}")
 
     model.load_state_dict(ckpt["model_state_dict"])
     model = model.to(device).eval()
     model = model.half() if use_fp16 else model.float()
-    return model
+    return model, scale
 
 def bgr_to_tensor_rgb01(frame_bgr: np.ndarray, device: torch.device, use_fp16: bool) -> torch.Tensor:
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -83,28 +86,33 @@ def open_camera(index: int, width: int, height: int, fps: int):
     print(f"Camera opened: {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)} @ {cap.get(cv2.CAP_PROP_FPS)}fps")
     return cap
 
-def create_side_by_side(original: np.ndarray, upscaled: np.ndarray) -> np.ndarray:
-    # Redimensionner upscaled à la même hauteur que l'original pour comparaison
-    h, w = original.shape[:2]
-    up_h, up_w = upscaled.shape[:2]
+def downscale_bicubic(img: np.ndarray, scale: int) -> np.ndarray:
+    h, w = img.shape[:2]
+    new_h, new_w = h // scale, w // scale
+    return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
+def create_side_by_side(downscaled: np.ndarray, upscaled: np.ndarray) -> np.ndarray:
+    # Les deux images doivent avoir la même taille pour comparaison
+    # downscaled = LR, upscaled = SR (même taille que l'original)
+    h_up, w_up = upscaled.shape[:2]
+    h_down, w_down = downscaled.shape[:2]
     
-    # Garder le ratio de l'upscaled, mais ajuster la hauteur
-    ratio = h / up_h
-    new_up_w = int(up_w * ratio)
-    upscaled_resized = cv2.resize(upscaled, (new_up_w, h), interpolation=cv2.INTER_LINEAR)
+    # Resize downscaled à la même taille que upscaled pour comparaison visuelle
+    downscaled_resized = cv2.resize(downscaled, (w_up, h_up), interpolation=cv2.INTER_CUBIC)
     
-    # Concatener horizontalement : Original | Upscaled
-    comparison = np.hstack([original, upscaled_resized])
+    # Concatener horizontalement : Downscaled (bicubic) | SR Upscaled
+    comparison = np.hstack([downscaled_resized, upscaled])
     
     # Ajouter des labels
     font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(comparison, "Original", (10, 30), font, 1, (0, 255, 0), 2)
-    cv2.putText(comparison, "SR Upscaled", (w + 10, 30), font, 1, (255, 0, 0), 2)
+    cv2.putText(comparison, f"Downscaled ({w_down}x{h_down})", (10, 30), font, 1, (0, 255, 0), 2)
+    cv2.putText(comparison, f"SR Upscaled ({w_up}x{h_up})", (w_up + 10, 30), font, 1, (255, 0, 0), 2)
     
     return comparison
 
 def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30):
-    model = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
+    model, scale = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
+    print(f"Model scale factor: {scale}x")
     cap = open_camera(cam_index, width, height, target_fps)
 
     cv2.namedWindow("SR Comparison", cv2.WINDOW_AUTOSIZE)
@@ -112,8 +120,9 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
     # Warm-up si possible
     ok, frame = cap.read()
     if ok:
+        downscaled = downscale_bicubic(frame, scale)
         for _ in range(3):
-            _ = upscale_frame(frame, model, DEVICE, USE_FP16)
+            _ = upscale_frame(downscaled, model, DEVICE, USE_FP16)
 
     failed_reads = 0
     while True:
@@ -131,14 +140,14 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
         failed_reads = 0
 
         try:
-            # Original frame
-            original = frame.copy()
+            # 1. Downscale HD frame to LR (simule données d'entrainement)
+            downscaled = downscale_bicubic(frame, scale)
             
-            # SR upscale
-            upscaled = upscale_frame(frame, model, DEVICE, USE_FP16)
+            # 2. SR upscale from LR back to HR
+            upscaled = upscale_frame(downscaled, model, DEVICE, USE_FP16)
             
-            # Side-by-side comparison
-            comparison = create_side_by_side(original, upscaled)
+            # 3. Side-by-side comparison: Downscaled vs SR
+            comparison = create_side_by_side(downscaled, upscaled)
             
         except Exception as e:
             print(f"Inference error: {e}")

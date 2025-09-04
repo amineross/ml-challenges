@@ -25,7 +25,7 @@ Continue training from a previously saved model checkpoint:
 
 ```bash
 # Resume training for 5 more epochs
-python main.py --model_class ESPCN --resume-from artifacts/espcn_state_dict.pt --epochs 5 --output-model artifacts/espcn_extended.pt
+python main.py --model-class ESPCN --resume-from artifacts/espcn_state_dict.pt --epochs 30 --output-model artifacts/espcn_extended.pt
 ```
 
 - The `--resume-from` flag loads a saved model checkpoint

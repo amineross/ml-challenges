@@ -45,6 +45,8 @@ def load_model_checkpoint(checkpoint_path, device):
     if checkpoint["model_class"] == "ESPCN":
         scale = checkpoint.get("scale", 4)  # Default to 4 if not saved
         model = ESPCN(scale=scale)
+    elif checkpoint["model_class"] == "FSRCNN":
+        model = FSRCNN()
     else:
         raise ValueError(f"Unknown model class: {checkpoint['model_class']}")
     
@@ -56,7 +58,11 @@ def load_model_checkpoint(checkpoint_path, device):
     learning_rate = checkpoint.get("learning_rate", 0.003)  # Default to 0.003 if not saved
     pytorch_version = checkpoint.get("pytorch_version", "unknown")
     
-    print(f"Loaded {checkpoint['model_class']} model (scale={scale})")
+    if checkpoint["model_class"] == "ESPCN":
+        print(f"Loaded {checkpoint['model_class']} model")
+    elif checkpoint["model_class"] == "FSRCNN":
+        print(f"Loaded {checkpoint['model_class']}")
+    
     print(f"Previous training: {previous_epochs} epochs")
     print(f"Learning rate: {learning_rate}")
     print(f"Saved with PyTorch version: {pytorch_version}")
@@ -167,6 +173,7 @@ if __name__=="__main__":
         "epochs": total_epochs,
         "learning_rate": learning_rate,
     }
+    
     
     torch.save(save_payload, output_path)
     print(f"Saved trained model to: {output_path}")

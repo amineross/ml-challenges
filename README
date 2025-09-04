@@ -9,11 +9,11 @@ Train the ESPCN model and export the trained weights (state_dict) to a file.
 Example:
 # ESPCN
 ```bash
-python main.py --model-class ESPCN --epochs 10 --output-model artifacts/espcn_state_dict.pt
+python main.py --model-class ESPCN --epochs 10 --batch-size 10 --output-model artifacts/espcn_state_dict.pt
 ```
 # FSRCNN
-```
-python main.py --model-class FSRCNN --epochs 10 --output-model artifacts/fsrcnn_state_dict.pt
+```bash
+python main.py --model-class FSRCNN --epochs 10 --batch-size 10 --output-model artifacts/fsrcnn_state_dict.pt
 ```
 
 - The output file contains a PyTorch `state_dict` plus metadata (model class, scale, PyTorch version, device, epochs).

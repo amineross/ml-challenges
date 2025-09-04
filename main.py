@@ -100,10 +100,11 @@ if __name__=="__main__":
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--resume-from", type=str, help="Path to model checkpoint to resume training from")
     parser.add_argument("--learning-rate", type=float, default=0.003, help="Learning rate for training")
+    parser.add_argument("--batch-size", type=int, default=10, help="Batch size for training")   
     args = parser.parse_args()
 
     trainDataset = ImageDataset('dataset/patches-div2k')
-    train = DataLoader(trainDataset, batch_size=10, shuffle=True)
+    train = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
     print(f"{len(train)*10} instances disponibles")
 
     if torch.cuda.is_available():
@@ -160,7 +161,7 @@ if __name__=="__main__":
     save_payload = {
         "model_state_dict": model.state_dict(),
         "model_class": args.model_class,
-        "scale": getattr(model, "scale", None),
+        "scale": 4,
         "pytorch_version": torch.__version__,
         "device": device_str,
         "epochs": total_epochs,

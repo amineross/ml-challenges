@@ -63,10 +63,26 @@ class UpscaleApp:
                            bg='#4a9eff', fg='white', font=('Arial', 10), relief=tk.FLAT, padx=15)
         add_btn.pack(side=tk.LEFT, padx=(0, 10))
         
+        # Buttons frame
+        buttons_frame = tk.Frame(controls_frame, bg='#2b2b2b')
+        buttons_frame.pack(side=tk.RIGHT)
+        
         # Load image button
-        load_btn = tk.Button(controls_frame, text="Load Image", command=self.load_image,
+        load_btn = tk.Button(buttons_frame, text="Load Image", command=self.load_image,
                             bg='#ff6b4a', fg='white', font=('Arial', 12), relief=tk.FLAT, padx=20)
-        load_btn.pack(side=tk.RIGHT)
+        load_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Reprocess button
+        self.reprocess_btn = tk.Button(buttons_frame, text="Reprocess", command=self.reprocess_image,
+                                      bg='#4a9eff', fg='white', font=('Arial', 12), relief=tk.FLAT, padx=20)
+        self.reprocess_btn.pack(side=tk.LEFT, padx=(0, 10))
+        self.reprocess_btn.config(state=tk.DISABLED)
+        
+        # Export button
+        self.export_btn = tk.Button(buttons_frame, text="Export", command=self.export_image,
+                                   bg='#50c878', fg='white', font=('Arial', 12), relief=tk.FLAT, padx=20)
+        self.export_btn.pack(side=tk.LEFT)
+        self.export_btn.config(state=tk.DISABLED)
         
         # Image display area
         display_frame = tk.Frame(main_frame, bg='#2b2b2b')
@@ -201,6 +217,10 @@ class UpscaleApp:
                 self.upscaled_image = self.upscale_image(self.original_image)
                 self.display_image(self.upscaled_image, self.upscaled_canvas)
                 
+                # Enable buttons after successful processing
+                self.reprocess_btn.config(state=tk.NORMAL)
+                self.export_btn.config(state=tk.NORMAL)
+                
                 self.status_var.set(f"Image processed - {self.original_image.size} → {self.upscaled_image.size}")
                 
             except Exception as e:
@@ -252,6 +272,52 @@ class UpscaleApp:
         canvas.delete("all")
         canvas.create_image(canvas_width//2, canvas_height//2, image=photo)
         canvas.image = photo  # Keep reference
+    
+    def reprocess_image(self):
+        """Reprocess the current image with the selected model"""
+        if not self.current_model:
+            messagebox.showwarning("Warning", "Please select a model first")
+            return
+        
+        if not self.original_image:
+            messagebox.showwarning("Warning", "Please load an image first")
+            return
+        
+        try:
+            self.status_var.set("Reprocessing image...")
+            self.root.update()
+            
+            # Upscale with current model
+            self.upscaled_image = self.upscale_image(self.original_image)
+            self.display_image(self.upscaled_image, self.upscaled_canvas)
+            
+            self.status_var.set(f"Image reprocessed - {self.original_image.size} → {self.upscaled_image.size}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to reprocess image: {str(e)}")
+            self.status_var.set(f"Error reprocessing image - Device: {self.device}")
+    
+    def export_image(self):
+        """Export the upscaled image"""
+        if not self.upscaled_image:
+            messagebox.showwarning("Warning", "No upscaled image to export")
+            return
+        
+        file_path = filedialog.asksaveasfilename(
+            title="Save Upscaled Image",
+            defaultextension=".png",
+            filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            try:
+                self.upscaled_image.save(file_path)
+                self.status_var.set(f"Image exported to: {file_path}")
+                messagebox.showinfo("Success", "Image exported successfully!")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export image: {str(e)}")
+                self.status_var.set(f"Error exporting image - Device: {self.device}")
 
 
 class ModelLabelDialog:

@@ -27,10 +27,8 @@ except Exception:
 def load_upscaler_from_checkpoint(checkpoint_path: str, device: torch.device, use_fp16: bool):
     ckpt = torch.load(checkpoint_path, map_location=device)
     model_class = ckpt["model_class"]
-    scale = ckpt.get("scale", 4)  # défaut 4
-    
     if model_class == "ESPCN":
-        model = ESPCN(scale=scale)
+        model = ESPCN(scale=ckpt.get("scale", 4))
     elif model_class == "FSRCNN":
         model = FSRCNN()
     else:
@@ -39,7 +37,7 @@ def load_upscaler_from_checkpoint(checkpoint_path: str, device: torch.device, us
     model.load_state_dict(ckpt["model_state_dict"])
     model = model.to(device).eval()
     model = model.half() if use_fp16 else model.float()
-    return model, scale  # retourner le scale aussi
+    return model
 
 def bgr_to_tensor_rgb01(frame_bgr: np.ndarray, device: torch.device, use_fp16: bool) -> torch.Tensor:
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -53,28 +51,6 @@ def tensor01rgb_to_bgr8(out: torch.Tensor) -> np.ndarray:
     out = out.clamp(0, 1).squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
     out = (out * 255.0).astype(np.uint8)
     return cv2.cvtColor(out, cv2.COLOR_RGB2BGR)
-
-def downscale_bicubic(img: np.ndarray, scale: int) -> np.ndarray:
-    h, w = img.shape[:2]
-    new_h, new_w = h // scale, w // scale
-    return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-
-def create_side_by_side(original: np.ndarray, upscaled: np.ndarray, downscaled: np.ndarray, model_name: str) -> np.ndarray:
-    # Redimensionner tout à la même taille pour comparaison
-    h, w = original.shape[:2]
-    upscaled_resized = cv2.resize(upscaled, (w, h), interpolation=cv2.INTER_LINEAR)
-    downscaled_resized = cv2.resize(downscaled, (w, h), interpolation=cv2.INTER_CUBIC)
-    
-    # Concatener horizontalement : Original | Downscaled+Bicubic | SR
-    comparison = np.hstack([original, downscaled_resized, upscaled_resized])
-    
-    # Ajouter des labels
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(comparison, "Original HD", (10, 30), font, 0.7, (0, 255, 0), 2)
-    cv2.putText(comparison, "Bicubic Upscale", (w + 10, 30), font, 0.7, (0, 0, 255), 2)
-    cv2.putText(comparison, f"SR ({model_name})", (2*w + 10, 30), font, 0.7, (255, 0, 0), 2)
-    
-    return comparison
 
 @torch.inference_mode()
 def upscale_frame(frame_bgr: np.ndarray, model: torch.nn.Module, device: torch.device, use_fp16: bool) -> np.ndarray:
@@ -107,21 +83,37 @@ def open_camera(index: int, width: int, height: int, fps: int):
     print(f"Camera opened: {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT)} @ {cap.get(cv2.CAP_PROP_FPS)}fps")
     return cap
 
-def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30):
-    model, scale = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
-    cap = open_camera(cam_index, width, height, target_fps)
+def create_side_by_side(original: np.ndarray, upscaled: np.ndarray) -> np.ndarray:
+    # Redimensionner upscaled à la même hauteur que l'original pour comparaison
+    h, w = original.shape[:2]
+    up_h, up_w = upscaled.shape[:2]
+    
+    # Garder le ratio de l'upscaled, mais ajuster la hauteur
+    ratio = h / up_h
+    new_up_w = int(up_w * ratio)
+    upscaled_resized = cv2.resize(upscaled, (new_up_w, h), interpolation=cv2.INTER_LINEAR)
+    
+    # Concatener horizontalement : Original | Upscaled
+    comparison = np.hstack([original, upscaled_resized])
+    
+    # Ajouter des labels
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(comparison, "Original", (10, 30), font, 1, (0, 255, 0), 2)
+    cv2.putText(comparison, "SR Upscaled", (w + 10, 30), font, 1, (255, 0, 0), 2)
+    
+    return comparison
 
-    # Extraire le nom du modèle pour l'affichage
-    model_name = checkpoint_path.split('/')[-1].replace('_state_dict.pt', '').upper()
+def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, height: int = 720, target_fps: int = 30):
+    model = load_upscaler_from_checkpoint(checkpoint_path, DEVICE, USE_FP16)
+    cap = open_camera(cam_index, width, height, target_fps)
 
     cv2.namedWindow("SR Comparison", cv2.WINDOW_AUTOSIZE)
 
     # Warm-up si possible
     ok, frame = cap.read()
     if ok:
-        downscaled = downscale_bicubic(frame, scale)
         for _ in range(3):
-            _ = upscale_frame(downscaled, model, DEVICE, USE_FP16)
+            _ = upscale_frame(frame, model, DEVICE, USE_FP16)
 
     failed_reads = 0
     while True:
@@ -139,17 +131,14 @@ def run_realtime(checkpoint_path: str, cam_index: int = 0, width: int = 1280, he
         failed_reads = 0
 
         try:
-            # 1. Original HD frame
+            # Original frame
             original = frame.copy()
             
-            # 2. Downscale pour simuler LR input (comme training data)
-            downscaled = downscale_bicubic(original, scale)
+            # SR upscale
+            upscaled = upscale_frame(frame, model, DEVICE, USE_FP16)
             
-            # 3. SR upscale
-            upscaled = upscale_frame(downscaled, model, DEVICE, USE_FP16)
-            
-            # 4. Side-by-side comparison
-            comparison = create_side_by_side(original, upscaled, downscaled, model_name)
+            # Side-by-side comparison
+            comparison = create_side_by_side(original, upscaled)
             
         except Exception as e:
             print(f"Inference error: {e}")

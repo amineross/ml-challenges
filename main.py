@@ -1,5 +1,6 @@
 from ESPCN import *
 from FSRCNN import *
+from EDSRLITE import *
 from ImageDataset import *
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -43,10 +44,12 @@ def load_model_checkpoint(checkpoint_path, device):
     
     # Create model instance
     if checkpoint["model_class"] == "ESPCN":
-        scale = checkpoint.get("scale", 4)  # Default to 4 if not saved
-        model = ESPCN(scale=scale)
+        #scale = checkpoint.get("scale", 4)  # Default to 4 if not saved
+        model = ESPCN()
     elif checkpoint["model_class"] == "FSRCNN":
         model = FSRCNN()
+    elif checkpoint["model_class"] == "EDSRLITE":
+        model = EDSRLITE()
     else:
         raise ValueError(f"Unknown model class: {checkpoint['model_class']}")
     
@@ -132,6 +135,8 @@ if __name__=="__main__":
         model = ESPCN()
     elif args.model_class == "FSRCNN":
         model = FSRCNN()
+    elif args.model_class == "EDSRLITE":
+        model = EDSRLITE()
 
     if args.resume_from:
         try:

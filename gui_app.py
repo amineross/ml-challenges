@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from ESPCN import ESPCN
 from FSRCNN import FSRCNN
+from EDSRLITE import EDSRLITE
 import os
 import glob
 
@@ -177,6 +178,9 @@ class UpscaleApp:
             elif checkpoint["model_class"] == "FSRCNN":
                 # Get FSRCNN parameters from checkpoint or use default
                 self.current_model = FSRCNN()
+            elif checkpoint["model_class"] == "EDSRLITE":
+                # Get EDSRLITE parameters from checkpoint or use default
+                self.current_model = EDSRLITE()
             else:
                 raise ValueError(f"Unknown model class: {checkpoint['model_class']}")
             

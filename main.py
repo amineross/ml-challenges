@@ -65,6 +65,8 @@ def load_model_checkpoint(checkpoint_path, device):
         print(f"Loaded {checkpoint['model_class']} model")
     elif checkpoint["model_class"] == "FSRCNN":
         print(f"Loaded {checkpoint['model_class']}")
+    elif checkpoint["model_class"] == "EDSRLITE":
+        print(f"Loaded {checkpoint['model_class']}")
     
     print(f"Previous training: {previous_epochs} epochs")
     print(f"Learning rate: {learning_rate}")

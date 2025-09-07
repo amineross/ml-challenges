@@ -1,39 +1,53 @@
-# ML-Challenges ESIEA 5A
-Amine ROSTANE
-Joplin WAMBA
+## ML Challenges
 
-## Training and Exporting the Model
+- Équipe - Amine ROSTANE, Joplin WAMBA GOULA
+- Majeure - IA & Data Science (5e année) @ ESIEA
+- Enseignant - Matthieu Le Berre
+- TD - ML Challenges
 
-Train the ESPCN model and export the trained weights (state_dict) to a file.
+---
 
-Example:
-# ESPCN
-```bash
-python main.py --model-class ESPCN --epochs 10 --batch-size 10 --output-model artifacts/espcn_state_dict.pt
-```
-# FSRCNN
-```bash
-python main.py --model-class FSRCNN --epochs 10 --batch-size 10 --output-model artifacts/fsrcnn_state_dict.pt
-```
+### Modèles entraînés (artifacts)
+- ESPCN - `artifacts/espcn_30_epoch.pt`
+- FSRCNN - `artifacts/fsrcnn_30_epoch.pt`
+- EDSRLite - `artifacts/edsrlite_5_epoch.pt`
 
-# EDSRLITE
-```bash
-python main.py --model-class EDSRLITE --epochs 10 --batch-size 10 --output-model artifacts/edsrlite_state_dict.pt
-```
+---
 
-- The output file contains a PyTorch `state_dict` plus metadata (model class, scale, PyTorch version, device, epochs).
-- You can change the save path with `--output-model`. The directory will be created if it does not exist.
-
-## Resuming Training
-
-Continue training from a previously saved model checkpoint:
+### Exécuter l’entraînement - `main.py`
+- Entraîne un modèle (ESPCN, FSRCNN, EDSRLITE), sauvegarde un checkpoint avec métadonnées
 
 ```bash
-# Resume training for 5 more epochs
-python main.py --model-class ESPCN --resume-from artifacts/espcn_state_dict.pt --epochs 30 --output-model artifacts/espcn_extended.pt
+# espcn
+python main.py --model-class ESPCN --epochs 30 --batch-size 10 --output-model artifacts/espcn_30_epoch.pt
+
+# fsrcnn
+python main.py --model-class FSRCNN --epochs 30 --batch-size 10 --output-model artifacts/fsrcnn_30_epoch.pt
+
+# edsrlite
+python main.py --model-class EDSRLITE --epochs 5 --batch-size 8 --output-model artifacts/edsrlite_5_epoch.pt
+
+# reprendre un entraînement
+python main.py --model-class ESPCN --resume-from artifacts/espcn_30_epoch.pt --epochs 10 --output-model artifacts/espcn_40_epoch.pt
 ```
 
-- The `--resume-from` flag loads a saved model checkpoint
-- Training continues with the correct epoch numbering
-- Total epochs are tracked across training sessions
-- If the checkpoint file is invalid or missing, training starts fresh automatically
+---
+
+### Interface graphique - `gui_app.py`
+- Ouvre une GUI pour charger un modèle `.pt`, importer une image et l’upscaler
+```bash
+python gui_app.py
+```
+
+---
+
+### Temps réel webcam - `realtime.py`
+- Compare côte à côte la montée bicubique vs la montée par le modèle, à partir d’une entrée basse résolution
+
+```bash
+# échelle auto d’après le checkpoint
+python realtime.py --checkpoint artifacts/espcn_30_epoch.pt
+
+# échelle explicite (ex. 4x)
+python realtime.py --checkpoint artifacts/espcn_30_epoch.pt --downscale 4 --width 1280 --height 720 --display-height 480
+```

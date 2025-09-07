@@ -29,7 +29,7 @@ if __name__ == '__main__':
     imgplot = plt.imshow(X)
     plt.title(f'Label: {y}')
     plt.show()
- """
+"""
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -54,18 +54,18 @@ class ImageDataset(Dataset):
 
         img_base = Image.open(img_path)
 
-        # High res
+        # high res
         img = img_base
         img = np.array(img)
-        img = img.transpose(2, 0, 1)
-        img = torch.from_numpy(img).float() / 255.0
+        # éviter from_numpy: passer par dlpack
+        t_hr = torch.utils.dlpack.from_dlpack(img.__dlpack__())  # [H,W,3] uint8 cpu
+        img = t_hr.permute(2, 0, 1).to(dtype=torch.float32).div(255.0)
         
-        # Low res
+        # low res
         img_low_res_base = img_base.resize((img_base.width // 4, img_base.height // 4))
         img_low_res = np.array(img_low_res_base)
-        img_low_res = img_low_res.transpose(2, 0, 1)
-        img_low_res = torch.from_numpy(img_low_res).float() / 255.0
-
+        t_lr = torch.utils.dlpack.from_dlpack(img_low_res.__dlpack__())
+        img_low_res = t_lr.permute(2, 0, 1).to(dtype=torch.float32).div(255.0)
 
         return img, img_low_res, filename
     
@@ -75,9 +75,11 @@ if __name__ == '__main__':
     img, img_low_res, fname = dataset[0]
     print(f"Shape du patch : {img.shape}, Shape du patch basse résolution : {img_low_res.shape}, nom : {fname}")
     
-    # Convert tensors to displayable numpy arrays (H, W, C) in [0, 255] uint8
-    img_disp = img.permute(1, 2, 0).clamp(0, 255).to(torch.uint8).numpy()
-    img_low_disp = img_low_res.permute(1, 2, 0).clamp(0, 255).to(torch.uint8).numpy()
+    # conversion des tensors en numpy arrays affichables (H, W, C) en [0, 255] uint8
+    img_disp = img.permute(1, 2, 0).clamp(0, 1).mul(255.0).to(torch.uint8).cpu()
+    img_low_disp = img_low_res.permute(1, 2, 0).clamp(0, 1).mul(255.0).to(torch.uint8).cpu()
+    img_disp = np.from_dlpack(img_disp)
+    img_low_disp = np.from_dlpack(img_low_disp)
 
     plt.figure(figsize=(10, 5))
     plt.subplot(1, 2, 1)

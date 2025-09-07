@@ -1,4 +1,5 @@
 dataset/
 .venv/
+.venvcompatible/
 __pycache__/
 .DS_Store

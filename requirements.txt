@@ -1,4 +1,7 @@
-numpy<2
+torch
+torchvision
+opencv-python
+numpy
 pillow
 matplotlib
 tqdm

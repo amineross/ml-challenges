@@ -7,7 +7,7 @@ import sys
 import time
 from tqdm import tqdm
 
-# Import from parent directory
+# importer depuis le répertoire parent
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from FSRCNN import *
@@ -21,7 +21,7 @@ import math
 from PIL import Image
 
 class EvalImageDataset(Dataset):
-    """Dataset class for evaluation datasets with separate X and Y directories"""
+    """classe dataset pour datasets d'évaluation avec répertoires X et Y séparés"""
     def __init__(self, x_dir, y_dir):
         self.x_dir = x_dir
         self.y_dir = y_dir
@@ -37,15 +37,17 @@ class EvalImageDataset(Dataset):
         x_path = os.path.join(self.x_dir, filename)
         y_path = os.path.join(self.y_dir, filename)
         
-        # Load low-resolution input
+        # charger l'entrée basse résolution
         x_img = Image.open(x_path).convert('RGB')
         x_array = np.array(x_img)
-        x_tensor = torch.from_numpy(x_array.transpose(2, 0, 1)).float() / 255.0
+        t_x = torch.utils.dlpack.from_dlpack(x_array.__dlpack__())
+        x_tensor = t_x.permute(2, 0, 1).to(dtype=torch.float32).div(255.0)
         
-        # Load high-resolution target
+        # charger la cible haute résolution
         y_img = Image.open(y_path).convert('RGB')
         y_array = np.array(y_img)
-        y_tensor = torch.from_numpy(y_array.transpose(2, 0, 1)).float() / 255.0
+        t_y = torch.utils.dlpack.from_dlpack(y_array.__dlpack__())
+        y_tensor = t_y.permute(2, 0, 1).to(dtype=torch.float32).div(255.0)
         
         return x_tensor, y_tensor
 
@@ -68,7 +70,7 @@ def safe_psnr(pred, target):
     target_np = target.detach().cpu()
     psnr_list = []
     n,m = pred_np.shape[2], pred_np.shape[3]
-    for i in range(pred_np.shape[0]): #pour chaque instance du batch
+    for i in range(pred_np.shape[0]): # pour chaque instance du batch
         mse = F.mse_loss(pred_np[i], target_np[i], reduction='mean').item()
         if mse==0: psnr_list.append(40)
         else: psnr_list.append(10 * math.log10(1.0 / mse))
@@ -98,16 +100,16 @@ def eval(model, dataloader, device, sameSize=False):
     print(f"PSNR: {avg_psnr:.2f} (=?{avg_psnr2:.2f})")
 
 def load_model_checkpoint(checkpoint_path, device):
-    """Load model from checkpoint file."""
+    """charger le modèle depuis le fichier checkpoint."""
     if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
+        raise FileNotFoundError(f"fichier checkpoint introuvable: {checkpoint_path}")
     
-    print(f"Loading model from: {checkpoint_path}")
+    print(f"chargement du modèle depuis: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    # Handle both old format (direct state_dict) and new format (checkpoint dict)
+    # gérer l'ancien format (state_dict direct) et le nouveau format (dict checkpoint)
     if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-        # New checkpoint format
+        # nouveau format checkpoint
         model_class = checkpoint["model_class"]
         state_dict = checkpoint["model_state_dict"]
     
@@ -116,19 +118,19 @@ def load_model_checkpoint(checkpoint_path, device):
         elif model_class == "FSRCNN":
             model = FSRCNN()
         else:
-            raise ValueError(f"Unknown model class: {model_class}")
+            raise ValueError(f"classe de modèle inconnue: {model_class}")
             
         model.load_state_dict(state_dict)
         return model, model_class.lower()
     else:
-        # Old format (direct state_dict) - we need to infer the model type
-        raise ValueError("Old checkpoint format not supported. Please provide model type explicitly.")
+        # ancien format (state_dict direct) - on doit déduire le type de modèle
+        raise ValueError("ancien format checkpoint non supporté. veuillez fournir le type de modèle explicitement.")
 
 if __name__=="__main__":
     datasetSet5 = EvalImageDataset(f'Set5/X', f'Set5/Y')
     datasetSet14 = EvalImageDataset(f'Set14/X', f'Set14/Y')
 
-    # Proper device detection
+    # détection appropriée du périphérique
     if torch.cuda.is_available():
         device = torch.device("cuda")
         device_str = "cuda"
@@ -138,37 +140,37 @@ if __name__=="__main__":
     else:
         device = torch.device("cpu")
         device_str = "cpu"
-    print(f"Using {device_str} device")
+    print(f"utilisation du périphérique {device_str}")
     
     set5 = DataLoader(datasetSet5, batch_size=1, shuffle=True)
     set14 = DataLoader(datasetSet14, batch_size=1, shuffle=True)
     
     if len(sys.argv) < 3:
-        print("Usage: python test.py <model_type> <model_path>")
-        print("Available model types: fsrcnn, espcn")
+        print("usage: python test.py <type_modèle> <chemin_modèle>")
+        print("types de modèles disponibles: fsrcnn, espcn")
         sys.exit(1)
     
     method = sys.argv[1].lower()
     model_path = sys.argv[2]
     
-    # Load model from checkpoint
+    # charger le modèle depuis le checkpoint
     try:
         model, detected_method = load_model_checkpoint(model_path, device)
-        method = detected_method  # Use the method from checkpoint
+        method = detected_method  # utiliser la méthode du checkpoint
     except Exception as e:
-        print(f"Error loading checkpoint: {e}")
-        print("Falling back to manual model creation...")
+        print(f"erreur lors du chargement du checkpoint: {e}")
+        print("retour à la création manuelle du modèle...")
         
-        # Manual model creation if checkpoint loading fails
+        # création manuelle du modèle si le chargement du checkpoint échoue
         if method == 'fsrcnn':
             model = FSRCNN(scale=4)
         elif method == 'espcn':
             model = ESPCN(scale=4)
         else:
-            print(f"Unknown method: {method}")
+            print(f"méthode inconnue: {method}")
             sys.exit(1)
         
-        # Try to load state dict directly
+        # essayer de charger le state dict directement
         try:
             state_dict = torch.load(model_path, map_location=device)
             if isinstance(state_dict, dict) and "model_state_dict" in state_dict:
@@ -176,12 +178,12 @@ if __name__=="__main__":
             else:
                 model.load_state_dict(state_dict)
         except Exception as e:
-            print(f"Error loading model weights: {e}")
+            print(f"erreur lors du chargement des poids du modèle: {e}")
             sys.exit(1)
     
-    print(f"Evaluation de {method} sur Set5")
+    print(f"évaluation de {method} sur set5")
     eval(model, set5, device=device, sameSize=False)
 
-    print(f"Evaluation de {method} sur Set14")
+    print(f"évaluation de {method} sur set14")
     eval(model, set14, device=device, sameSize=False)
 
